@@ -7,4 +7,5 @@ Uses selenium to launch a web app with webrtc stream and gets several webRTC met
 - Needs Selenium python package installed
 
 **How to run** 
+- Edit the meeting_url variable in sssd_twilio.py to point to your own room
 - python sssd_twilio.py 
