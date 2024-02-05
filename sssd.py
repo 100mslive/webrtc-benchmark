@@ -47,13 +47,32 @@ def main():
     # driver=webdriver.ie()
     # maximize the window size
     driver.maximize_window()
-    # user your meeting URL
-    meeting_url = "https://video-app-1307-7706-dev.twil.io?passcode=83336513077706"
+    # navigate to the url
+    # qa
+    # meeting_url = "https://narayan.qa-app.100ms.live/preview/lvx-smp-gle"
+    # prod-in2
+    # meeting_url = "https://narayan.app.100ms.live/preview/jvv-hsch-vyc"
+    # prod-eu3
+    # meeting_url = "https://narayan.app.100ms.live/meeting/vaq-skrw-gwk"
+    # preprod
+    # meeting_url = "https://narayan.app.100ms.live/preview/xcr-jjsd-zcj"
+    # qa daily
+    meeting_url = "https://narayan.qa-app.100ms.live/meeting/ret-orxh-pes"
     driver.get(meeting_url)
+    WebDriverWait(driver, 40).until(EC.element_to_be_clickable(
+        (By.ID, "name"))).send_keys("test_narayan")
 
-    time.sleep(30)
+    join_room_text = WebDriverWait(driver, 40).until(EC.element_to_be_clickable((By.XPATH,
+                                                                                 "//*[contains(text(),'Join')]")))
+    join_room = join_room_text.find_element(By.XPATH, '..')
+    WebDriverWait(driver, 40).until(
+        EC.element_to_be_clickable(join_room)).click()
 
-    stats = get_twilio_stats_from_js(driver)
+    # WebDriverWait(driver, 40).until(EC.element_to_be_clickable((By.XPATH,
+    #                                                            "//*[contains(text(),'Start Recording')]")))
+    time.sleep(10)
+
+    stats = get_stats_from_js(driver)
 
     remote_port = get_remote_port(stats)
 
@@ -66,12 +85,11 @@ def main():
         last = 0
         # maintain current layer state to count the number of layer switches
         current_video_layer = "none"
-        layer_frames_decoded = {}
-        layer_seconds = {}
+        layer_stats = {}
 
         while True:
             next_call = next_call+1
-            stats = get_twilio_stats_from_js(driver)
+            stats = get_stats_from_js(driver)
 
             new_port = get_remote_port(stats)
             if remote_port != new_port and new_port:
@@ -80,27 +98,42 @@ def main():
 
             v = get_inbound_rtp_stats(stats, 'video')[0]
             print(
-                f"video {v['framesDropped']=},{v['freezeCount']=},{v['pauseCount']=},{v['packetsLost']=}")
+                f"video {v['framesDropped']=},{v['freezeCount']=},{v['pauseCount']=},{v['packetsLost']=},{v['totalFreezesDuration']=},{v['totalPausesDuration']=}")
             frames_decoded_in_last_sec = 0
             if last != 0:
                 frames_decoded_in_last_sec = v['framesDecoded'] - last
                 if frames_decoded_in_last_sec == 0:
                     total_seconds_degraded += 1
             last = v['framesDecoded']
+            height = v['frameHeight']
+
+            def get_temporal_from_framesPerSecond(fps):
+                if height == 720:
+                    if fps > 15:
+                        return "30"
+                    elif fps > 7:
+                        return "15"
+                    elif fps > 3:
+                        return "7"
+                else:
+                    if fps > 7:
+                        return "15"
+                    elif fps > 4:
+                        return "7"
+                    elif fps > 1:
+                        return "3"
+                return "0"
             if 'framesPerSecond' in v:
                 fps = get_temporal_from_framesPerSecond(v['framesPerSecond'])
             else:
                 fps = 0
 
-            height = v['frameHeight']
             new_video_layer = "" + str(height) + "p" + str(fps)
 
-            if new_video_layer in layer_frames_decoded:
-                layer_frames_decoded[new_video_layer] += frames_decoded_in_last_sec
-                layer_seconds[new_video_layer] += 1
+            if new_video_layer in layer_stats:
+                layer_stats[new_video_layer] += frames_decoded_in_last_sec
             else:
-                layer_frames_decoded[new_video_layer] = frames_decoded_in_last_sec
-                layer_seconds[new_video_layer] = 1
+                layer_stats[new_video_layer] = frames_decoded_in_last_sec
 
             if frames_decoded_in_last_sec == 0:
                 new_video_layer = "degraded"
@@ -112,11 +145,11 @@ def main():
             total_video_frames_decoded += frames_decoded_in_last_sec
 
             print(f"frames:{total_video_frames_decoded=},{total_seconds_degraded=}",
-                  f"{current_video_layer=},{total_video_layer_switches=},", layer_frames_decoded, layer_seconds)
+                  f"{current_video_layer=},{total_video_layer_switches=},", layer_stats)
 
             a = get_inbound_rtp_stats(stats, 'audio')[0]
             print(
-                f"audio {a['concealedSamples']=},{a['packetsLost']=},{a['packetsDiscarded']=},{throttle_kbps=}")
+                f"audio {a['concealedSamples']=},{a['packetsLost']=},{a['packetsDiscarded']=},{a['estimatedPlayoutTimestamp']=},{throttle_kbps=}")
             if next_call - time.time() > 0:
                 time.sleep(next_call - time.time())
 
@@ -134,6 +167,8 @@ def main():
 
     throttle_array = [150, 500, 300, 150, 150, 200, 1200,
                       1500, 300, 300, 150, 150, 200, 200, 250, 250, 500, 500]
+    # throttle_array = [300, 80, 1200, 80, 100, 1300, 300, 1200, 80, 1500, 80, 300, 300, 300, 300, 300, 300,
+    #                   300, 300, 300, 300, 300, 300, 80, 150, 150, 200, 200, 250, 250, 250, 500, 500, 500, 500, 500]
     for num_kbps in throttle_array:
         print('Current DateTime:', datetime.now())
         throttle_network1(num_kbps)

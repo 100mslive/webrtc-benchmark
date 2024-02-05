@@ -88,7 +88,7 @@ def get_remote_port(stats):
 def get_inbound_rtp_stats(stats, kind):
     media_stats = []
     for stat in stats:
-        if stat.get('type') == 'inbound-rtp' and stat.get('kind') == kind:
+        if stat.get('type') == 'inbound-rtp' and stat.get('kind') == kind and stat.get('trackIdentifier') != 'probator':
             media_stats.append(stat)
     return media_stats
 
