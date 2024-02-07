@@ -152,7 +152,7 @@ def main():
 
             a = get_inbound_rtp_stats(stats, 'audio')[0]
             print(
-                f"audio {a['concealedSamples']=},{a['packetsLost']=},{a['packetsDiscarded']=},{a['estimatedPlayoutTimestamp']=},{throttle_kbps=}")
+                f"audio {a['concealedSamples']=},{a['packetsLost']=},{a['packetsDiscarded']=},{a.get('estimatedPlayoutTimestamp')=},{throttle_kbps=}")
             if next_call - time.time() > 0:
                 time.sleep(next_call - time.time())
 
