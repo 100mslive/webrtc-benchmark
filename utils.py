@@ -91,13 +91,14 @@ def get_remote_port(stats):
                     f"got from nomnated search, port:{stat.get('port')}, isremote:{stat.get('isRemote')}")
                 return str(remote_port)
 
-    for stat in stats:
-        if stat.get('type') == 'remote-candidate' and \
-                (stat.get('candidateType') == 'srflx' or stat.get('candidateType') == 'prflx' or stat.get('candidateType') == 'host'):
-            remote_port = stat.get('port')
-            print(
-                f"got from first remote candidate, port:{stat.get('port')}, isremote:{stat.get('isRemote')}")
-            return str(remote_port)
+    # for stat in stats:
+    #     if stat.get('type') == 'remote-candidate' and \
+    #             (stat.get('candidateType') == 'srflx' or stat.get('candidateType') == 'prflx' or stat.get('candidateType') == 'host'):
+    #         remote_port = stat.get('port')
+    #         print(
+    #             f"got from first remote candidate, port:{stat.get('port')}, isremote:{stat.get('isRemote')}")
+    #         return str(remote_port)
+    return None
 
 
 def get_inbound_rtp_stats(stats, kind):
