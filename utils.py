@@ -77,11 +77,26 @@ def get_publish_stats_from_js(driver):
 
 
 def get_remote_port(stats):
+    remote_candidate_id = None
+    # first find the in progress candidate pair
+    for stat in stats:
+        if stat.get('type') == 'candidate-pair' and stat.get('nominated') and stat.get('state') == 'succeeded':
+            remote_candidate_id = stat.get('remoteCandidateId')
+    print(f"{remote_candidate_id=}")
+    if remote_candidate_id:
+        for stat in stats:
+            if stat.get('type') == 'remote-candidate' and stat.get('id') == remote_candidate_id:
+                remote_port = stat.get('port')
+                print(
+                    f"got from nomnated search, port:{stat.get('port')}, isremote:{stat.get('isRemote')}")
+                return str(remote_port)
+
     for stat in stats:
         if stat.get('type') == 'remote-candidate' and \
                 (stat.get('candidateType') == 'srflx' or stat.get('candidateType') == 'prflx' or stat.get('candidateType') == 'host'):
             remote_port = stat.get('port')
-            print(f"port:{stat.get('port')}, isremote:{stat.get('isRemote')}")
+            print(
+                f"got from first remote candidate, port:{stat.get('port')}, isremote:{stat.get('isRemote')}")
             return str(remote_port)
 
 

@@ -90,6 +90,7 @@ def main():
         while True:
             next_call = next_call+1
             stats = get_stats_from_js(driver)
+            # print(f"{stats=}")
 
             new_port = get_remote_port(stats)
             if remote_port != new_port and new_port:
