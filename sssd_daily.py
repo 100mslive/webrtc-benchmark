@@ -141,9 +141,9 @@ def main():
                     elif fps > 3:
                         return "7"
                 else:
-                    if fps > 7:
+                    if fps > 11:
                         return "15"
-                    elif fps > 4:
+                    elif fps > 5:
                         return "7"
                     elif fps > 1:
                         return "3"

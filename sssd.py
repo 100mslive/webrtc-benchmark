@@ -86,7 +86,7 @@ def main():
         # maintain current layer state to count the number of layer switches
         current_video_layer = "none"
         layer_stats = {}
-
+        layer_seconds = {}
         while True:
             next_call = next_call+1
             stats = get_stats_from_js(driver)
@@ -116,9 +116,9 @@ def main():
                     elif fps > 3:
                         return "7"
                 else:
-                    if fps > 7:
+                    if fps > 11:
                         return "15"
-                    elif fps > 4:
+                    elif fps > 5:
                         return "7"
                     elif fps > 1:
                         return "3"
@@ -132,8 +132,10 @@ def main():
 
             if new_video_layer in layer_stats:
                 layer_stats[new_video_layer] += frames_decoded_in_last_sec
+                layer_seconds[new_video_layer] += 1
             else:
                 layer_stats[new_video_layer] = frames_decoded_in_last_sec
+                layer_seconds[new_video_layer] = 1
 
             if frames_decoded_in_last_sec == 0:
                 new_video_layer = "degraded"
@@ -145,7 +147,7 @@ def main():
             total_video_frames_decoded += frames_decoded_in_last_sec
 
             print(f"frames:{total_video_frames_decoded=},{total_seconds_degraded=}",
-                  f"{current_video_layer=},{total_video_layer_switches=},", layer_stats)
+                  f"{current_video_layer=},{total_video_layer_switches=},", layer_stats, layer_seconds)
 
             a = get_inbound_rtp_stats(stats, 'audio')[0]
             print(
