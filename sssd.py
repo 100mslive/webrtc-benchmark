@@ -58,6 +58,9 @@ def main():
     # meeting_url = "https://narayan.app.100ms.live/preview/xcr-jjsd-zcj"
     # qa daily
     meeting_url = "https://narayan.qa-app.100ms.live/meeting/ret-orxh-pes"
+    # meeting_url = "https://narayan.app.100ms.live/meeting/mdp-erma-fnl"
+    # meeting_url = "https://akash-videoconf-1125.app.100ms.live/meeting/tka-gpxd-esg"
+
     driver.get(meeting_url)
     WebDriverWait(driver, 40).until(EC.element_to_be_clickable(
         (By.ID, "name"))).send_keys("test_narayan")
@@ -168,8 +171,10 @@ def main():
     timerThread.start()
     time.sleep(20)
 
-    throttle_array = [150, 500, 300, 150, 150, 200, 1200,
-                      1500, 300, 300, 150, 150, 200, 200, 250, 250, 500, 500]
+    throttle_array = [150, 1500, 300, 500, 200]
+
+    # throttle_array = [150, 500, 300, 150, 150, 200, 1200,
+    #                   1500, 300, 300, 150, 150, 200, 200, 250, 250, 500, 500]
     # throttle_array = [300, 80, 1200, 80, 100, 1300, 300, 1200, 80, 1500, 80, 300, 300, 300, 300, 300, 300,
     #                   300, 300, 300, 300, 300, 300, 80, 150, 150, 200, 200, 250, 250, 250, 500, 500, 500, 500, 500]
     for num_kbps in throttle_array:

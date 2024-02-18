@@ -78,11 +78,25 @@ def get_publish_stats_from_js(driver):
 
 def get_remote_port(stats):
     remote_candidate_id = None
+    local_candidate_id = None
     # first find the in progress candidate pair
     for stat in stats:
         if stat.get('type') == 'candidate-pair' and stat.get('nominated') and stat.get('state') == 'succeeded':
             remote_candidate_id = stat.get('remoteCandidateId')
+            local_candidate_id = stat.get('localCandidateId')
     print(f"{remote_candidate_id=}")
+    if local_candidate_id:
+        for stat in stats:
+            if stat.get('type') == 'local-candidate' and stat.get('id') == local_candidate_id:
+                candidateType = stat.get('candidateType')
+                url = stat.get('url')
+                print(f"{candidateType=},{url=}")
+                if url and 'turn' in url and candidateType == 'relay':
+                    remote_port = 3478
+                    print(
+                        f"got from relay port:{remote_port}")
+                    return str(remote_port)
+
     if remote_candidate_id:
         for stat in stats:
             if stat.get('type') == 'remote-candidate' and stat.get('id') == remote_candidate_id:
