@@ -57,6 +57,28 @@ def get_twilio_stats_from_js(driver):
     return stats
 
 
+def get_daily_stats_from_js(driver):
+    script1 = '''
+
+  var stats1=[]
+  var stats = rtcpeers.soup.recvTransport._handler._pc.getStats()
+  stats.then(
+    function(value) {value.forEach((result, i) => {
+          stats1.push(result)
+      })},
+    function(error) {console.log(error); stats1.push(error)}
+  ); 
+  await stats;
+
+  return stats1
+    
+  '''
+
+    stats = driver.execute_script(script1)
+    # print(f'stats={stats}')
+    return stats
+
+
 def get_publish_stats_from_js(driver):
     script1 = '''
   var stats1=[]

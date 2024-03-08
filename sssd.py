@@ -15,6 +15,9 @@ import os
 
 from utils import *
 
+import csv
+
+
 total_video_frames_decoded = 0
 total_video_frames_decoded_180p = 0
 total_video_frames_decoded_360p = 0
@@ -23,9 +26,36 @@ total_seconds_degraded = 0
 remote_port = ''
 throttle_kbps = 1000000
 total_video_layer_switches = 0
+expected_resolution = 1280*720.0
+
+
+def clip(value, min_value, max_value):
+    return max(min(value, max_value), min_value)
+
+# 5*(p1)^3*(p2)^0.3*(p3)^0.5*(p4)^1*(p5)*2
+
+
+def calc_qoe(freeze_duration_norm, resolution_norm, fps_norm, delay_norm, audio_concealed_norm):
+    freeze_duration_norm = clip(freeze_duration_norm, 0, 1)
+    resolution_norm = clip(resolution_norm, 0, 1)
+    fps_norm = clip(fps_norm, 0, 1)
+    delay_norm = clip(delay_norm, 0, 1)
+    audio_concealed_norm = clip(audio_concealed_norm, 0, 1)
+    return 5*(freeze_duration_norm ** 3)*(resolution_norm ** 0.3)*(fps_norm ** 0.2)*(delay_norm ** 0.5)*(audio_concealed_norm ** 2)
 
 
 def main():
+
+    # Add this line to create a new CSV file or append to an existing one
+    csv_file = open('stats.csv', 'w', newline='')
+    csv_writer = csv.writer(csv_file)
+
+    # Add a header row if the file is new
+    if os.stat('stats.csv').st_size == 0:
+        csv_writer.writerow(['Timestamp', 'bitrate_kbps', 'Total Frames Decoded', 'freeze+pause in seconds', 'fps',
+                            'Current Video Layer', 'freeze_duration_norm', 'resolution_norm',
+                             'fps_norm', 'delay_norm', 'audio_concealed_norm', 'QoE'])
+
     global remote_port, throttle_kbps
     print("sample test case started")
 
@@ -57,9 +87,9 @@ def main():
     # preprod
     # meeting_url = "https://narayan.app.100ms.live/preview/xcr-jjsd-zcj"
     # qa daily
-    # meeting_url = "https://narayan.qa-app.100ms.live/meeting/ret-orxh-pes"
+    meeting_url = "https://narayan.qa-app.100ms.live/meeting/ret-orxh-pes"
     # meeting_url = "https://narayan.app.100ms.live/meeting/mdp-erma-fnl"
-    meeting_url = "https://akash-videoconf-1125.app.100ms.live/meeting/tka-gpxd-esg"
+    # meeting_url = "https://akash-videoconf-1125.app.100ms.live/meeting/tka-gpxd-esg"
 
     driver.get(meeting_url)
     WebDriverWait(driver, 40).until(EC.element_to_be_clickable(
@@ -90,6 +120,22 @@ def main():
         current_video_layer = "none"
         layer_stats = {}
         layer_seconds = {}
+        last_freeze_duration = 0
+        last_concealed_samples = 0
+        last_jitter_buffer_delay = 0
+        last_jitter_buffer_emitted_count = 0
+        last_jitter_buffer_delay_in_ms = 100
+        # calculate QoE using 5 params:
+        # p1:freeze_duration_norm p2:resolution_norm p3:fps_norm p4:delay_norm p5:audio_concealed_norm
+        # the formula is 5*(1-p1)^3*(1-p2)^0.3*(1-p3)^0.5*(1-p4)^1*(1-p5)*2
+
+        freeze_duration_norm = 0
+        resolution_norm = 0
+        fps_norm = 0
+        delay_norm = 0
+        audio_concealed_norm = 0
+        # calculate these 5 params every second
+
         while True:
             next_call = next_call+1
             stats = get_stats_from_js(driver)
@@ -110,6 +156,46 @@ def main():
                     total_seconds_degraded += 1
             last = v['framesDecoded']
             height = v['frameHeight']
+            width = v['frameWidth']
+            resolution_norm = (width*height/expected_resolution)
+
+            freeze_duration_norm = 1 - (v['totalFreezesDuration'] -
+                                        last_freeze_duration)
+
+            if freeze_duration_norm < 0:
+                freeze_duration_norm = 0.5
+            last_freeze_duration = v['totalFreezesDuration']
+
+            if frames_decoded_in_last_sec == 0:
+                freeze_duration_norm = 0
+
+            fps_norm = (frames_decoded_in_last_sec/30)
+
+            current_jb_delay = v['jitterBufferDelay'] - \
+                last_jitter_buffer_delay
+            current_jb_emitted_count = v['jitterBufferEmittedCount'] - \
+                last_jitter_buffer_emitted_count
+            last_jitter_buffer_delay = v['jitterBufferDelay']
+            last_jitter_buffer_emitted_count = v['jitterBufferEmittedCount']
+
+            if current_jb_emitted_count > 0:
+                jitter_buffer_delay_in_ms = current_jb_delay*1000 / current_jb_emitted_count
+            else:
+                jitter_buffer_delay_in_ms = last_jitter_buffer_delay_in_ms
+
+            last_jitter_buffer_delay_in_ms = jitter_buffer_delay_in_ms
+            delay_norm = 1 - min(1, jitter_buffer_delay_in_ms/2000)
+
+            a = get_inbound_rtp_stats(stats, 'audio')[0]
+            current_concealed_samples = a['concealedSamples'] - \
+                a['silentConcealedSamples'] - last_concealed_samples
+            last_concealed_samples = a['concealedSamples'] - \
+                a['silentConcealedSamples']
+
+            audio_concealed_norm = 1 - current_concealed_samples/48000
+
+            qoe = calc_qoe(freeze_duration_norm, resolution_norm,
+                           fps_norm, delay_norm, audio_concealed_norm)
 
             def get_temporal_from_framesPerSecond(fps):
                 if height == 720:
@@ -153,7 +239,21 @@ def main():
             print(f"frames:{total_video_frames_decoded=},{total_seconds_degraded=}",
                   f"{current_video_layer=},{total_video_layer_switches=},", layer_stats, layer_seconds)
 
-            a = get_inbound_rtp_stats(stats, 'audio')[0]
+            freeze_duration_norm = round(freeze_duration_norm, 2)
+            resolution_norm = round(resolution_norm, 2)
+            fps_norm = round(fps_norm, 2)
+            delay_norm = round(delay_norm, 2)
+            audio_concealed_norm = round(audio_concealed_norm, 2)
+            qoe = round(qoe, 2)
+            print(
+                f"{freeze_duration_norm=},{resolution_norm=},{fps_norm=},{delay_norm=},{audio_concealed_norm=},{qoe=}")
+
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            csv_row = [timestamp, throttle_kbps, total_video_frames_decoded, v['totalFreezesDuration']+v['totalPausesDuration'], frames_decoded_in_last_sec,
+                       current_video_layer, freeze_duration_norm, resolution_norm, fps_norm, delay_norm, audio_concealed_norm, qoe]
+
+            csv_writer.writerow(csv_row)
+
             print(
                 f"audio {a['concealedSamples']=},{a['packetsLost']=},{a['packetsDiscarded']=},{a.get('estimatedPlayoutTimestamp')=},{throttle_kbps=}")
             if next_call - time.time() > 0:
@@ -171,7 +271,7 @@ def main():
     timerThread.start()
     time.sleep(10)
 
-    throttle_array = [(150, 120), (1500, 120),
+    throttle_array = [(150, 120), (3000, 120),
                       (300, 120), (500, 120), (200, 120)]
     # throttle_array = [(1500, 10), (150, 5), (1500, 120)]
     # throttle_array = [150, 500, 300, 150, 150, 200, 1200,
@@ -190,6 +290,8 @@ def main():
 
     print(f"summary:{total_video_frames_decoded=},{total_video_frames_decoded_180p=},",
           f"{total_video_frames_decoded_360p=},{total_video_frames_decoded_720p=},{total_seconds_degraded=}")
+
+    csv_file.close()
 
 
 if __name__ == "__main__":
